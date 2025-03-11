@@ -2,18 +2,42 @@ import requests
 import time
 
 
-if __name__ == '__main__':
-    # Чтение данных по URL. Далее останавливаем программу на нужное количество секунд и снова считываем данные.
-    start_data = requests.get('https://api.forexrateapi.com/v1/latest?api_key=d1ec91b7fe280d12387b0b8314397dbf&base=USD&currencies=EUR,INR,JPY,AUD,BTC,KZT,RWF,RUB,TWD').json()
-    time.sleep(60)
-    end_data = requests.get('https://api.forexrateapi.com/v1/latest?api_key=d1ec91b7fe280d12387b0b8314397dbf&base=USD&currencies=EUR,INR,JPY,AUD,BTC,KZT,RWF,RUB,TWD').json()
-    
-    # Создаём словарь с изменениями курса валют, используя map. Находим статистику, используя функции min() и max().  
-    changes = dict(map(lambda currency : (currency, end_data['rates'][currency] - start_data['rates'][currency]), start_data['rates']))
-    max_up_currency, max_up_value = max(changes.items(), key = lambda x: x[1])
-    max_down_currency, max_down_value = min(changes.items(), key = lambda x: x[1])
-    stable_currency, stable_value = min(changes.items(), key = lambda x: abs(x[1]))
+URL = 'https://api.forexrateapi.com/v1/latest?api_key=d1ec91b7fe280d12387b0b8314397dbf&base=USD&currencies=EUR,INR,JPY,AUD,BTC,KZT,RWF,RUB,TWD'
 
-    print(f"Больше всего взлетела валюта {max_up_currency}: на {max_up_value}.")  if any(change > 0 for change in changes.values()) else print("Никакая валюта не взлетела.")
-    print(f"Больше всего упала валюта {max_down_currency}: на {max_down_value}.") if any(change < 0 for change in changes.values()) else print("Никакая валюта не упала.")
-    print(f"Самая стабильная валюта - {stable_currency} с изменением {stable_value}.")
+def get_data(url):
+    '''Читает данные по URL и возвращает JSON. Если произошла ошибка - вернет None.'''
+    try:
+        data = requests.get(url, timeout = 10)
+        data.raise_for_status()
+        return data.json()
+    except requests.exceptions.ConnectionError:
+        print("Ошибка: нет подключения к интернету или сервер недоступен.")
+    except requests.exceptions.Timeout:
+        print("Ошибка: превышено время ожидания ответа от сервера.")
+    except requests.exceptions.HTTPError as error:
+        print(f"Ошибка HTTP: {error}")
+    except requests.exceptions.JSONDecodeError:
+        print("Ошибка: невалидный JSON.")
+    return None
+
+def max_up(start_data, end_data):
+    '''Анализирует начальные и конечные курсы валют и выводит валюту, которая больше всего взлетела.'''
+    return max(dict(map(lambda currency : (currency, end_data['rates'][currency] - start_data['rates'][currency]), start_data['rates'])).items(), key = lambda x: x[1])
+
+def max_down(start_data, end_data):
+    '''Анализирует начальные и конечные курсы валют и выводит валюту, которая больше всего упала.'''
+    return min(dict(map(lambda currency : (currency, end_data['rates'][currency] - start_data['rates'][currency]), start_data['rates'])).items(), key = lambda x: x[1])
+
+def stable(start_data, end_data):
+    '''Анализирует начальные и конечные курсы валют и выводит самую стабильную валюту.'''
+    return min(dict(map(lambda currency : (currency, end_data['rates'][currency] - start_data['rates'][currency]), start_data['rates'])).items(), key = lambda x: abs(x[1]))
+
+if __name__ == '__main__':
+    start_data = get_data(URL)
+    time.sleep(60)
+    end_data = get_data(URL)
+    
+    if end_data and start_data:
+        print(f"Валюта с самым большим ростом: {max_up(start_data, end_data)}.")
+        print(f"Валюта с самым большим ростом: {max_down(start_data, end_data)}.")
+        print(f"Самая стабильная валюта: {stable(start_data, end_data)}.")
